@@ -26,4 +26,4 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Команда запуска с подробным логированием
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
