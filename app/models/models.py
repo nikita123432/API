@@ -40,4 +40,9 @@ class DeviceLog(Base):
     timestamp = Column(DateTime, nullable=False)
     details = Column(JSON, nullable=False)
 
+    @property
+    def username(self):
+        """Доступ к имени пользователя через отношение"""
+        return self.user.username if self.user else None
+
     user = relationship("User", back_populates="devicelog")

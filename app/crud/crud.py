@@ -9,7 +9,7 @@ from jose import jwt, JWTError
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.auth import security
 from app.database import get_db
@@ -173,7 +173,7 @@ async def create_device_log(db: AsyncSession, user_id: int, action: str, object_
 
 async def get_device_log(db: AsyncSession, skip: int = 0, limit: int = 100, object_type: str = None, object_id: int = None, user_id: int = None):
     query = select(models.DeviceLog).options(
-        selectinload(models.DeviceLog.user)  #
+        joinedload(models.DeviceLog.user)  # Используем joinedload для загрузки отношений
     )
 
     if object_type:
@@ -186,5 +186,5 @@ async def get_device_log(db: AsyncSession, skip: int = 0, limit: int = 100, obje
     query = query.offset(skip).limit(limit).order_by(models.DeviceLog.timestamp.desc())
 
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.unique().scalars().all()
 
