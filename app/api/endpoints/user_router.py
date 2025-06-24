@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
-from app.models import models
+from app.db.repositories.user_repository import UserRepository
 from app.services.auth import authenticate_user, pwd_context, security, send_email_with_code
 from app.models.models import User
 from app.database import get_db
@@ -16,38 +16,28 @@ from datetime import datetime, timedelta
 
 from app.schemas.user_schema import UserCreate, Token, UserResponse, ChangePassword, PasswordResetRequest, \
     SetNewPasswordRequest, CustomLoginForm
+from app.services.user_services import UserService
 
 router = APIRouter(tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    username_result = await db.execute(select(User).where(User.username == user.username))
-    if username_result.scalar_one_or_none():
-        raise HTTPException(400, "Username exists")
+async def register(
+        user: UserCreate,
+        db: AsyncSession = Depends(get_db)
+):
+    user_repository = UserRepository(db)
+    user_service = UserService(user_repository)
 
-    email_result = await db.execute(select(User).where(User.email == user.email))
-    if email_result.scalar_one_or_none():
-        raise HTTPException(400, "Email exists")
-
-    hashed_password = pwd_context.hash(user.password)
-    new_user = User(
-        username=user.username,
-        email=user.email,
-        hashed_password=hashed_password
-    )
-
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    new_user = await user_service.register_user(user)
     return new_user
+
 
 
 @router.post("/login", response_model=Token)
 async def login(
         response: Response,
         form_data: CustomLoginForm = Depends(),
-        db: AsyncSession = Depends(get_db)
 ):
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
