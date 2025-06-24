@@ -2,7 +2,7 @@ services:
   db:
     image: postgres
     container_name: db
-    restart: on-failure
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASSWORD}
@@ -19,10 +19,18 @@ services:
     networks:
       - app-network
 
-  web:
+  app:
     build: .
+    container_name: app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - .:/app
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - PG_USER=${PG_USER}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_DB=${PG_DB}
     ports:
       - "8000:8000"
     depends_on:

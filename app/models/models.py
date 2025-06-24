@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declarative_base
 
-from app.database import Base
+Base = declarative_base()
 
 
 class User(Base):
@@ -13,11 +13,10 @@ class User(Base):
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
 
-    reset_code = Column(String, nullable=True)  # 4-значный код
+    reset_code = Column(String, nullable=True)
     reset_code_expiration = Column(DateTime, nullable=True)
 
     devicelog = relationship("DeviceLog", back_populates="user")
-
 
 
 class ISGDevice(Base):
@@ -25,10 +24,11 @@ class ISGDevice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     uid = Column(String, unique=True, index=True)
-    ip_address = Column(String, nullable=False)
+    ip_address = Column(String, unique=True, nullable=False)
     port = Column(Integer, nullable=False)
     admin_username = Column(String(100), nullable=False)
     admin_password = Column(String, nullable=False)
+
 
 class DeviceLog(Base):
     __tablename__ = "devicelog"
@@ -42,7 +42,6 @@ class DeviceLog(Base):
 
     @property
     def username(self):
-        """Доступ к имени пользователя через отношение"""
         return self.user.username if self.user else None
 
     user = relationship("User", back_populates="devicelog")

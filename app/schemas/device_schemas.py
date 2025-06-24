@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -10,6 +11,7 @@ class ISGDeviceBase(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class ISGDeviceCreate(ISGDeviceBase):
     pass
 
@@ -17,3 +19,4 @@ class ISGDeviceCreate(ISGDeviceBase):
 class ISGDevice(ISGDeviceBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
+

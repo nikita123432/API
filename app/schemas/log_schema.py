@@ -10,8 +10,10 @@ class DeviceLogBase(BaseModel):
     details: dict = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class DeviceLogCreate(DeviceLogBase):
     pass
+
 
 class DeviceLog(DeviceLogBase):
     id: int
@@ -19,7 +21,7 @@ class DeviceLog(DeviceLogBase):
     timestamp: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class LogWithUser(DeviceLog):
     username: str
     model_config = ConfigDict(from_attributes=True)
-
