@@ -1,13 +1,21 @@
+import datetime
+from datetime import datetime, timedelta
+
 import jwt
-from fastapi import Depends, Cookie, HTTPException, status
+from fastapi import Depends, Cookie, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
+from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.auth import JWT_ALGORITHM, JWT_SECRET_KEY
 from app.db.repositories.user_repository import get_user_by_id
 from app.database import get_db
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 async def get_current_user(
     token_header: str = Depends(oauth2_scheme),
@@ -49,3 +57,18 @@ async def get_current_user(
             detail="User not found",
         )
     return user
+
+
+def create_access_token(uid: str) -> str:
+    expire = datetime.utcnow() + timedelta(minutes=30)
+    to_encode = {"sub": uid, "exp": expire}
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+def set_access_cookies(token: str, response: Response):
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax"
+    )

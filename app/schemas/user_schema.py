@@ -43,6 +43,9 @@ class CustomLoginForm:
         self.username = username
         self.password = password
 
+    model_config = ConfigDict(from_attributes=True)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str

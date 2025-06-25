@@ -1,59 +1,71 @@
 from datetime import datetime
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.models import models
+from app.models.models import DeviceLog
 
 
-async def create_device_log(db: AsyncSession, user_id: int, action: str, object_type: str, object_id: int,
-                            details: dict = None):
-    db_log = models.DeviceLog(
-        user_id=user_id,
-        action=action,
-        object_type=object_type,
-        object_id=object_id,
-        timestamp=datetime.utcnow(),
-        details=details
-    )
-    db.add(db_log)
-    await db.commit()
-    await db.refresh(db_log)
-    return db_log
+class LogRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
+    async def get_audit_logs(
+            self,
+            page_number: int = 1,
+            page_size: int = 100,
+            object_type: Optional[str] = None,
+            object_id: Optional[int] = None,
+            user_id: Optional[int] = None
+    ) -> Tuple[List[DeviceLog], int]:
+        offset = (page_number - 1) * page_size
 
-async def get_device_log(db: AsyncSession,page_number: int = 1, page_size: int = 100, object_type: str = None,
-                         object_id: int = None, user_id: int = None)-> Tuple[List[models.DeviceLog], int]:
-    offset = (page_number - 1) * page_size
-    query = select(models.DeviceLog).options(
-        joinedload(models.DeviceLog.user)
-    )
+        query = select(DeviceLog).options(
+            joinedload(DeviceLog.user)
+        ).order_by(
+            DeviceLog.timestamp.desc()
+        ).offset(offset).limit(page_size)
 
-    if object_type:
-        query = query.where(models.DeviceLog.object_type == object_type)
-    if object_id:
-        query = query.where(models.DeviceLog.object_id == object_id)
-    if user_id:
-        query = query.where(models.DeviceLog.user_id == user_id)
+        count_query = select(func.count(DeviceLog.id))
 
-    data_query = query.order_by(
-        models.DeviceLog.timestamp.desc()
-    ).offset(offset).limit(page_size)
+        filters = []
+        if object_type:
+            filters.append(DeviceLog.object_type == object_type)
+        if object_id:
+            filters.append(DeviceLog.object_id == object_id)
+        if user_id:
+            filters.append(DeviceLog.user_id == user_id)
 
-    count_query = select(func.count(models.DeviceLog.id))
+        if filters:
+            query = query.where(*filters)
+            count_query = count_query.where(*filters)
 
-    if object_type:
-        count_query = count_query.where(models.DeviceLog.object_type == object_type)
-    if object_id:
-        count_query = count_query.where(models.DeviceLog.object_id == object_id)
-    if user_id:
-        count_query = count_query.where(models.DeviceLog.user_id == user_id)
+        result = await self.db.execute(query)
+        logs = result.unique().scalars().all()
 
-    result = await db.execute(data_query)
-    logs = result.unique().scalars().all()
+        total = await self.db.scalar(count_query)
 
-    total = await db.scalar(count_query)
+        return logs, total
 
-    return logs, total
+    async def create_device_log(
+            self,
+            user_id: int,
+            action: str,
+            object_type: str,
+            object_id: int,
+            details: dict = None
+    ) -> DeviceLog:
+        db_log = DeviceLog(
+            user_id=user_id,
+            action=action,
+            object_type=object_type,
+            object_id=object_id,
+            timestamp=datetime.utcnow(),
+            details=details
+        )
+        self.db.add(db_log)
+        await self.db.commit()
+        await self.db.refresh(db_log)
+        return db_log

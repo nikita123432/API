@@ -2,12 +2,12 @@ import datetime
 
 from random import randint
 
-from fastapi import Depends, HTTPException, Response, APIRouter, BackgroundTasks, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Depends, HTTPException, Response, APIRouter, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, set_access_cookies
 from app.db.repositories.user_repository import UserRepository
+from app.dependencies import get_auth_service, get_user_service
 from app.services.auth import authenticate_user, pwd_context, security, send_email_with_code
 from app.models.models import User
 from app.database import get_db
@@ -33,50 +33,34 @@ async def register(
     return new_user
 
 
-
 @router.post("/login", response_model=Token)
 async def login(
         response: Response,
         form_data: CustomLoginForm = Depends(),
+        auth_service: UserService = Depends(get_auth_service)
 ):
-    user = await authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(401, "Invalid credentials")
-
-    access_token = security.create_access_token(
-        uid=str(user.id),
+    auth_data = await auth_service.authenticate_user(
+        form_data.username,
+        form_data.password
     )
 
-    security.set_access_cookies(access_token, response)
+    set_access_cookies(auth_data["access_token"], response)
 
     return {
-        "access_token": access_token,
+        "access_token": auth_data["access_token"],
         "token_type": "bearer"
     }
-
-
 @router.put("/change-password")
 async def change_password(
-        passwords: ChangePassword,
-        current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db)
+    passwords: ChangePassword,
+    current_user: User = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
 ):
-    user = current_user
-
-    if not pwd_context.verify(passwords.old_password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect old password")
-
-    if len(passwords.new_password) < 8:
-        raise HTTPException(status_code=400, detail="New password is too short (minimum 8 characters)")
-
-    new_hashed_password = pwd_context.hash(passwords.new_password)
-
-    user.hashed_password = new_hashed_password
-    db.add(user)
-    await db.commit()
-
-    return {"message": "Password changed successfully"}
-
+    return await user_service.change_password(
+        user=current_user,
+        old_password=passwords.old_password,
+        new_password=passwords.new_password
+    )
 
 @router.post("/request-password-reset")
 async def request_password_reset(request: PasswordResetRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
